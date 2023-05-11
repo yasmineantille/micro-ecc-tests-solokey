@@ -1747,7 +1747,7 @@ int uECC_scalar_multiplication(uint8_t * result,
     return 1;
 }
 
-int uECC_addition(uint8_t * result,
+int uECC_addition_old(uint8_t * result,
                   uint8_t * x,
                   uint8_t * y,
                   uECC_Curve curve)
@@ -1770,6 +1770,63 @@ int uECC_addition(uint8_t * result,
     // get result in bytes, is it X1 or X2?
     uECC_vli_nativeToBytes(result, num_bytes, X2);
     uECC_vli_nativeToBytes(result + num_bytes, num_bytes, Y2);
+
+    return 1;
+}
+
+int uECC_addition(uint8_t * result, uint8_t * P, uint8_t * Q, uECC_Curve curve)
+{
+    const wordcount_t num_bytes = curve->num_bytes;
+    const wordcount_t num_words = curve->num_words;
+
+    // Allocate proper memory for the two points and output result in native type
+    uECC_word_t _p[uECC_MAX_WORDS * 2];
+    uECC_word_t _q[uECC_MAX_WORDS * 2];
+    uECC_word_t _result[uECC_MAX_WORDS * 2];
+    uECC_word_t X1[uECC_MAX_WORDS], Y1[uECC_MAX_WORDS], X2[uECC_MAX_WORDS], Y2[uECC_MAX_WORDS];
+    uECC_word_t z[uECC_MAX_WORDS];
+
+    // Convert points from uint8_t format to native format to check if valid points
+    uECC_vli_bytesToNative(_p, P, num_bytes);
+    uECC_vli_bytesToNative(_p + num_words, P + num_bytes, num_bytes);
+    uECC_vli_bytesToNative(_q, Q, num_bytes);
+    uECC_vli_bytesToNative(_q + num_words, Q + num_bytes, num_bytes);
+
+    // Make sure receiving points are valid
+    if (!uECC_valid_point(_p, curve) || !uECC_valid_point(_q, curve)) {
+        return 5;
+    }
+
+    // convert points to projective coordinates
+    uECC_vli_bytesToNative(X1, P, num_bytes);
+    uECC_vli_bytesToNative(Y1, P + num_bytes, num_bytes);
+    uECC_vli_bytesToNative(X2, Q, num_bytes);
+    uECC_vli_bytesToNative(Y2, Q + num_bytes, num_bytes);
+
+    // uECC uses projective Jacobian coordinates internally for point representation,
+    // but the Z coordinate is implicit during the Montgomery ladder since P and Q share same Z coordinate
+    // See http://eprint.iacr.org/2011/338.pdf
+
+    // To find the final Z value I follow the example in uECC_verify for G + Q
+    uECC_vli_modSub(z, X2, X1, curve->p, num_words);
+    XYcZ_add(X1, Y1, X2, Y2, curve);
+    uECC_vli_modInv(z, z, curve->p, num_words);
+    // Apply Z coordinate to the result
+    apply_z(X2, Y2, z, curve);
+
+    uECC_vli_set(_result, X2, num_words);
+    uECC_vli_set(_result + num_words, Y2, num_words);
+
+    // Check if the resulting point is on the curve
+    if (!uECC_valid_point(_result, curve)) {
+        return 0;
+    }
+
+#if uECC_VLI_NATIVE_LITTLE_ENDIAN == 0
+    // Convert resulting point to uint8_t format
+    uECC_vli_nativeToBytes(result, num_bytes, _q);
+    uECC_vli_nativeToBytes(result + num_bytes, num_bytes, _q + num_words);
+#endif
 
     return 1;
 }

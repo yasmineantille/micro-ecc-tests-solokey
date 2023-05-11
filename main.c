@@ -109,14 +109,51 @@ void test_scalar_multiplication()
     }
 }
 
+void test_point_addition()
+{
+    uint8_t * p[64];
+    uint8_t * q[64];
+    uint8_t * result[64];
+    uint8_t * priv_key_buffer[32];   // buffer for private key that can be dismissed
+
+    // generate p as point on elliptic curve
+    if (uECC_make_key(p, priv_key_buffer, _curve) != 1)
+    {
+        printf("Unsuccessful in generating p!\n");
+    } else {
+        if (uECC_valid_public_key(p, _curve) == 1) {
+            printf("Valid point p generated!\n");
+        } else {
+            printf("Invalid point p generated!\n");
+        }
+    }
+
+    // generate q as point on elliptic curve
+    if (uECC_make_key(q, priv_key_buffer, _curve) != 1)
+    {
+        printf("Unsuccessful in generating q!\n");
+    } else {
+        if (uECC_valid_public_key(q, _curve) == 1) {
+            printf("Valid point q generated!\n");
+        } else {
+            printf("Invalid point q generated!\n");
+        }
+    }
+
+    int res = uECC_addition(result, p, q, _curve);
+    printf("Result of addition: %d", res);
+}
+
 int main() {
     // init elliptic curve
     crypto_ecc256_init();
 
     // find out native endian setting
-    find_out_endian();
+    //find_out_endian();
 
-    test_scalar_multiplication();
+    //test_scalar_multiplication();
+
+    test_point_addition();
 
     return 0;
 }
