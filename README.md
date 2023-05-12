@@ -16,3 +16,17 @@ If you forget the submodules in the clone, you can still get the files with the 
 git submodule init
 git submodule update
 ```
+
+
+## Compilation Notes
+
+### Prerequisites
+Before compiling the project, ensure you have the following prerequisites installed:
+
+- CMake (version 3.22 or higher)
+- C compiler (GCC, Clang, or any other compatible compiler)
+- CLion IDE (optional but recommended)
+ 
+### Additional Notes
+- The micro-ecc library should compile with any C/C++ compiler that supports stdint.h.  
+- This project is set up to use CMake as the build system and is designed to be used with [CLion](https://www.jetbrains.com/clion/), an IDE for C and C++ development.
