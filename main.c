@@ -7,22 +7,9 @@
 
 static const struct uECC_Curve_t * _curve =  NULL;
 
-// will be overwritten
-__attribute__((weak)) int ctap_generate_rng(uint8_t * dst, size_t num)
-{
-    printf("ctap_generate_rng() called\n");
-
-    int i;
-    printf( "Insecure RNG being used.\r\n");
-    for (i = 0; i < num; i++){
-        dst[i] = (uint8_t)rand();
-    }
-}
-
 void crypto_ecc256_init(void)
 {
     // TODO: Make sure this is correctly set to secure rng
-    uECC_set_rng((uECC_RNG_Function)ctap_generate_rng);
     _curve = uECC_secp256r1();
 }
 
@@ -43,26 +30,37 @@ void find_out_endian()
     printf("Native endian is: %d\n", nativeEndian());
 }
 
+void print_bits(uint8_t * number, int size)
+{
+    printByteArrayBits(number, size);
+    printf("\n");
+}
+
+void print_bytes(uint8_t * number, int size)
+{
+    for (int i = 0; i < size; i++) {
+        printf("%02X", number[i]);
+    }
+    printf("\n");
+}
+
 void test_scalar_multiplication()
 {
-    // a scalar with value 1
+    printf("-------Running Scalar Multiplication Test!-------\n");
+
     uint8_t scalar[32];
-    memset(scalar, 0, sizeof(scalar));
+    // to set scalar to 1 in first byte only uncomment following two lines and remove the for-loop
+//    memset(scalar, 0, sizeof(scalar));
+//    scalar[0] = 1;
     for (int i = 0; i<32; i++) {
         scalar[i] = 1;
     }
 
     // Printing the scalar for verification
     printf("Scalar value: ");
-    for (int i = 0; i < sizeof(scalar); i++) {
-        printf("%02x", scalar[i]);
-    }
-    printf("\n");
-    printf("Scalar value in bits: ");
-    printByteArrayBits(scalar, sizeof(scalar));
-    printf("\n");
+    print_bytes(&scalar, 32);
 
-    uint8_t * g[64];
+    uint8_t * g[64];    // point g on elliptic curve G
     uint8_t * priv_key_buffer[32];   // buffer for private key that can be dismissed
 
     // generate g as point on elliptic curve (public key)
@@ -71,46 +69,37 @@ void test_scalar_multiplication()
         printf("Unsuccessful in generating g!\n");
     } else {
         if (uECC_valid_public_key(g, _curve) == 1) {
-            printf("Valid point g generated!\n");
-            printf("Value of g: ");
-            for(int i = 0; i < 64; i++) {
-                printf("%d ", g[i]);
-            }
-            printf("\n");
+            printf("Valid point g generated with value: ");
+            print_bytes(g, 64);
         } else {
             printf("Invalid point g generated!\n");
+            exit(1);
         }
     }
 
-    uint8_t * mult_buffer[64];   // buffer for scalar mult
+    uint8_t * mult_result[64];
 
-    int result = uECC_scalar_multiplication(mult_buffer, g, scalar, _curve);
-    if (result == 1)
-    {
-        printf("Success!\n");
-        printf("Resulting point: ");
-        for(int i = 0; i < 64; i++) {
-            printf("%d ", mult_buffer[i]);
-        }
-        printf("\n");
-        if (uECC_valid_public_key(mult_buffer, _curve) == 1) {
-            printf("Valid new point generated!\n");
-        } else {
-            printf("Invalid new point generated!\n");
-        }
-    } else if (result == 2) {
-        printf("Invalid point!");
-    } else if (result == 3) {
-        printf("3");
-    } else if (result == 5) {
-        printf("Invalid scalar");
+    // calculate scalar multiplication of g and scalar on the curve
+    if (uECC_scalar_multiplication(mult_result, g, scalar, _curve) != 1) {
+        printf("Unsuccessful scalar multiplication!\n");
     } else {
-        printf("Unsuccessful scalar multiplication\n");
+        printf("Result of scalar multiplication: ");
+        print_bytes(mult_result, 64);
+
+        // make sure result is a valid public key
+        if (uECC_valid_public_key(mult_result, _curve) == 1) {
+            printf("Result is valid new point on the elliptic curve!\n");
+        } else {
+            printf("Result is invalid!\n");
+        }
     }
+    printf("\n");
 }
 
 void test_point_addition()
 {
+    printf("-------Running Point Addition Test!-------\n");
+
     uint8_t * p[64];
     uint8_t * q[64];
     uint8_t * result[64];
@@ -119,10 +108,11 @@ void test_point_addition()
     // generate p as point on elliptic curve
     if (uECC_make_key(p, priv_key_buffer, _curve) != 1)
     {
-        printf("Unsuccessful in generating p!\n");
+        printf("Unsuccessful in generating point p!\n");
     } else {
         if (uECC_valid_public_key(p, _curve) == 1) {
-            printf("Valid point p generated!\n");
+            printf("Valid point p generated with value: ");
+            print_bytes(p, 64);
         } else {
             printf("Invalid point p generated!\n");
         }
@@ -131,17 +121,31 @@ void test_point_addition()
     // generate q as point on elliptic curve
     if (uECC_make_key(q, priv_key_buffer, _curve) != 1)
     {
-        printf("Unsuccessful in generating q!\n");
+        printf("Unsuccessful in generating point q!\n");
     } else {
         if (uECC_valid_public_key(q, _curve) == 1) {
-            printf("Valid point q generated!\n");
+            printf("Valid point q generated with value: ");
+            print_bytes(q, 64);
         } else {
             printf("Invalid point q generated!\n");
         }
     }
 
-    int res = uECC_addition(result, p, q, _curve);
-    printf("Result of addition: %d", res);
+    // calculate addition R = P + Q
+    if (uECC_addition(result, p, q, _curve)!= 1) {
+        printf("Unsuccessful addition!\n");
+    } else {
+        printf("Result of addition: ");
+        print_bytes(result, 64);
+
+        // make sure result is a valid public key
+        if (uECC_valid_public_key(result, _curve) == 1) {
+            printf("Result is valid new point on the elliptic curve!\n");
+        } else {
+            printf("Result is invalid!\n");
+        }
+    }
+    printf("\n");
 }
 
 int main() {
@@ -151,7 +155,7 @@ int main() {
     // find out native endian setting
     //find_out_endian();
 
-    //test_scalar_multiplication();
+    test_scalar_multiplication();
 
     test_point_addition();
 
