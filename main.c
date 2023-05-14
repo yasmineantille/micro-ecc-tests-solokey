@@ -5,12 +5,23 @@
 #include "micro-ecc/uECC.h"
 #include "nativeEndian.h"
 
-static const struct uECC_Curve_t * _curve =  NULL;
+static const struct uECC_Curve_t * curve =  NULL;
+
+
+__attribute__((weak)) int ctap_generate_rng(uint8_t * dst, size_t num)
+{
+    int i;
+    printf("Insecure RNG being used.\r\n");
+    for (i = 0; i < num; i++){
+        dst[i] = (uint8_t)rand();
+    }
+    return 1;
+}
 
 void crypto_ecc256_init(void)
 {
-    // TODO: Make sure this is correctly set to secure rng
-    _curve = uECC_secp256r1();
+    uECC_set_rng((uECC_RNG_Function)ctap_generate_rng);
+    curve = uECC_secp256r1();
 }
 
 void printByteArrayBits(const uint8_t* array, size_t length) {
@@ -64,11 +75,11 @@ void test_scalar_multiplication()
     uint8_t * priv_key_buffer[32];   // buffer for private key that can be dismissed
 
     // generate g as point on elliptic curve (public key)
-    if (uECC_make_key(g, priv_key_buffer, _curve) != 1)
+    if (uECC_make_key(g, priv_key_buffer, curve) != 1)
     {
         printf("Unsuccessful in generating g!\n");
     } else {
-        if (uECC_valid_public_key(g, _curve) == 1) {
+        if (uECC_valid_public_key(g, curve) == 1) {
             printf("Valid point g generated with value: ");
             print_bytes(g, 64);
         } else {
@@ -80,14 +91,14 @@ void test_scalar_multiplication()
     uint8_t * mult_result[64];
 
     // calculate scalar multiplication of g and scalar on the curve
-    if (uECC_scalar_multiplication(mult_result, g, scalar, _curve) != 1) {
+    if (uECC_scalar_multiplication(mult_result, g, scalar, curve) != 1) {
         printf("Unsuccessful scalar multiplication!\n");
     } else {
         printf("Result of scalar multiplication: ");
         print_bytes(mult_result, 64);
 
         // make sure result is a valid public key
-        if (uECC_valid_public_key(mult_result, _curve) == 1) {
+        if (uECC_valid_public_key(mult_result, curve) == 1) {
             printf("Result is valid new point on the elliptic curve!\n");
         } else {
             printf("Result is invalid!\n");
@@ -106,11 +117,11 @@ void test_point_addition()
     uint8_t * priv_key_buffer[32];   // buffer for private key that can be dismissed
 
     // generate p as point on elliptic curve
-    if (uECC_make_key(p, priv_key_buffer, _curve) != 1)
+    if (uECC_make_key(p, priv_key_buffer, curve) != 1)
     {
         printf("Unsuccessful in generating point p!\n");
     } else {
-        if (uECC_valid_public_key(p, _curve) == 1) {
+        if (uECC_valid_public_key(p, curve) == 1) {
             printf("Valid point p generated with value: ");
             print_bytes(p, 64);
         } else {
@@ -119,11 +130,11 @@ void test_point_addition()
     }
 
     // generate q as point on elliptic curve
-    if (uECC_make_key(q, priv_key_buffer, _curve) != 1)
+    if (uECC_make_key(q, priv_key_buffer, curve) != 1)
     {
         printf("Unsuccessful in generating point q!\n");
     } else {
-        if (uECC_valid_public_key(q, _curve) == 1) {
+        if (uECC_valid_public_key(q, curve) == 1) {
             printf("Valid point q generated with value: ");
             print_bytes(q, 64);
         } else {
@@ -132,18 +143,41 @@ void test_point_addition()
     }
 
     // calculate addition R = P + Q
-    if (uECC_addition(result, p, q, _curve)!= 1) {
+    if (uECC_addition(result, p, q, curve) != 1) {
         printf("Unsuccessful addition!\n");
     } else {
         printf("Result of addition: ");
         print_bytes(result, 64);
 
         // make sure result is a valid public key
-        if (uECC_valid_public_key(result, _curve) == 1) {
+        if (uECC_valid_public_key(result, curve) == 1) {
             printf("Result is valid new point on the elliptic curve!\n");
         } else {
             printf("Result is invalid!\n");
         }
+    }
+    printf("\n");
+}
+
+void test_mod_inv()
+{
+    uint8_t * result[64];
+    uint8_t * r[2];
+
+    printf("-------Running Modular Inverse Test!-------\n");
+
+    if (ctap_generate_rng(r, 2) != 1) {
+        printf("Failed at generating r\n");
+    } else {
+        printf("Random r generated: ");
+        print_bytes(r, 2);
+    }
+
+    if (uECC_calculate_mod_inv(result, r, curve) != 1) {
+        printf("Error, calculating modular inverse of r failed\n");
+    } else {
+        printf("Successfully calculated modular inverse of r with value: ");
+        print_bytes(result, 32);
     }
     printf("\n");
 }
@@ -158,6 +192,8 @@ int main() {
     test_scalar_multiplication();
 
     test_point_addition();
+
+    test_mod_inv();
 
     return 0;
 }
