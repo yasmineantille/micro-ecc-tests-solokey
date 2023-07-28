@@ -182,6 +182,58 @@ void test_mod_inv()
     printf("\n");
 }
 
+
+void test_scalar_mult_with_expected_result()
+{
+    printf("-------Running Scalar Multiplication with scalar 2 and expected result Test!-------\n");
+    // Scalar multiplication of 2
+    uint8_t scalar[32];
+    memset(scalar, 0, sizeof(scalar));
+    scalar[31] = 2;
+
+    // Using a previously generated valid point
+    const uint8_t point[] = {
+            0x85, 0x55, 0xF4, 0x5F, 0xB8, 0x20, 0x13, 0x85, 0x83, 0xBF, 0xCF, 0xC0, 0xA7, 0x2A, 0xE0, 0xF0,
+            0xF8, 0xA1, 0x69, 0x61, 0x4C, 0x15, 0xF7, 0x98, 0x74, 0x84, 0xCE, 0xD7, 0x72, 0xBC, 0x81, 0x0C,
+            0xA6, 0xE0, 0xAC, 0xF1, 0x33, 0xFA, 0xD0, 0x93, 0x44, 0x26, 0x33, 0x80, 0x04, 0xC7, 0x76, 0xB5,
+            0xBF, 0x92, 0x5F, 0x75, 0x5D, 0xE8, 0xD2, 0xE2, 0xBE, 0x44, 0xF6, 0xB3, 0xE4, 0xF0, 0x5F, 0x07
+    };
+    printf("The point for multiplication is: ");
+    print_bytes(point, 64);
+
+    uint8_t mult_result[64];
+    // calculate scalar multiplication of point and scalar on the curve
+    if (uECC_scalar_multiplication(mult_result, point, scalar, curve) != 1) {
+        printf("Unsuccessful scalar multiplication!\n");
+    } else {
+        printf("Result of scalar multiplication with 2: ");
+        print_bytes(mult_result, 64);
+
+        // make sure result is a valid public key
+        if (uECC_valid_public_key(mult_result, curve) != 1) {
+            printf("Result is invalid!\n");
+        }
+    }
+
+    const uint8_t expected_result[] = {
+            0x71, 0x34, 0x89, 0x68, 0x7A, 0xDF, 0x6E, 0xC9, 0xAE, 0xFC, 0xD2, 0xAE, 0x80, 0xF6, 0x4B, 0x43,
+            0x9F, 0x7A, 0x8B, 0x0D, 0xAE, 0xDC, 0xFD, 0x5D, 0xEB, 0x1D, 0x3A, 0xEF, 0x02, 0x5E, 0xA8, 0xEC,
+            0x42, 0x40, 0xD8, 0xC6, 0xB5, 0xB7, 0xFC, 0x34, 0x5D, 0xBB, 0xE7, 0xF9, 0xE2, 0xB7, 0x3B, 0xDE,
+            0xB3, 0xE2, 0x57, 0xB7, 0x74, 0x45, 0x6E, 0x6D, 0x57, 0x2F, 0xC0, 0xF2, 0xD7, 0x75, 0x40, 0xAF
+    };
+
+    int result = memcmp(mult_result, expected_result, sizeof(expected_result));
+    if (result == 0) {
+        printf("Test passed! Result of scalar multiplication returns the expected result. \n");
+    } else {
+        printf("Test failed.\n");
+        printf("Expected result was: ");
+        print_bytes(expected_result, 64);
+        printf("\nHowever the received result was: ");
+        print_bytes(mult_result, 64);
+    }
+}
+
 int main() {
     // init elliptic curve
     crypto_ecc256_init();
@@ -194,6 +246,8 @@ int main() {
     test_point_addition();
 
     test_mod_inv();
+
+    test_scalar_mult_with_expected_result();
 
     return 0;
 }
